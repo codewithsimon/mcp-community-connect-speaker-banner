@@ -20,17 +20,19 @@ export default function App() {
   const [warnings, setWarnings] = useState<string[]>([])
   const [banners, setBanners] = useState<GeneratedBanner[]>([])
   const abortRef = useRef<AbortController | null>(null)
+  const bannersRef = useRef<GeneratedBanner[]>([])
   const generationRef = useRef(0)
 
   useEffect(() => {
     return () => {
       abortRef.current?.abort()
-      banners.forEach((banner) => URL.revokeObjectURL(banner.previewUrl))
+      bannersRef.current.forEach((banner) => URL.revokeObjectURL(banner.previewUrl))
     }
-  }, [banners])
+  }, [])
 
   function clearBanners() {
-    banners.forEach((banner) => URL.revokeObjectURL(banner.previewUrl))
+    bannersRef.current.forEach((banner) => URL.revokeObjectURL(banner.previewUrl))
+    bannersRef.current = []
     setBanners([])
   }
 
@@ -93,6 +95,7 @@ export default function App() {
         discardGenerated()
         return
       }
+      bannersRef.current = generated
       setBanners(generated)
       setWarnings([
         ...schedule.warnings,
@@ -108,6 +111,24 @@ export default function App() {
       if (error instanceof DOMException && error.name === 'AbortError') return
       setStatus('error')
       setMessage(errorMessage(error))
+    }
+  }
+
+  function handleBannerDownload(banner: GeneratedBanner) {
+    try {
+      downloadBanner(banner)
+    } catch (error) {
+      setStatus('error')
+      setMessage(`Could not download ${banner.filename}: ${errorMessage(error)}`)
+    }
+  }
+
+  async function handleZipDownload() {
+    try {
+      await downloadBannerZip(banners)
+    } catch (error) {
+      setStatus('error')
+      setMessage(`Could not create the ZIP download: ${errorMessage(error)}`)
     }
   }
 
@@ -211,7 +232,7 @@ export default function App() {
             <button
               className="secondary-button"
               type="button"
-              onClick={() => void downloadBannerZip(banners)}
+              onClick={() => void handleZipDownload()}
             >
               Download all as ZIP
             </button>
@@ -240,7 +261,7 @@ export default function App() {
                     <h3>{banner.session.title}</h3>
                     <p>{banner.speakers.map((speaker) => speaker.fullName).join(', ')}</p>
                   </div>
-                  <button type="button" onClick={() => downloadBanner(banner)}>
+                  <button type="button" onClick={() => handleBannerDownload(banner)}>
                     Download PNG
                   </button>
                 </div>
