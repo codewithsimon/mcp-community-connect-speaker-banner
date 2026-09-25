@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../src/App'
 import type { NormalizedSchedule } from '../src/types'
 
@@ -42,6 +42,8 @@ vi.mock('../src/sessionize', () => ({
 }))
 
 describe('App generation', () => {
+  afterEach(cleanup)
+
   beforeEach(() => {
     vi.stubGlobal('URL', {
       ...URL,
@@ -68,5 +70,28 @@ describe('App generation', () => {
 
     expect(await screen.findByText('Generated 1 banner.')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: /Building reliable agents/ })).toBeInTheDocument()
+  })
+
+  it('generates square and widescreen versions when both backgrounds are supplied', async () => {
+    render(<App />)
+
+    fireEvent.change(screen.getByPlaceholderText(/cnyq0f99 or/), {
+      target: { value: 'cnyq0f99' },
+    })
+    const fileInputs = document.querySelectorAll<HTMLInputElement>('input[type="file"]')
+    fireEvent.change(fileInputs[0], {
+      target: { files: [new File(['square'], 'square.png', { type: 'image/png' })] },
+    })
+    fireEvent.change(fileInputs[1], {
+      target: { files: [new File(['widescreen'], 'widescreen.png', { type: 'image/png' })] },
+    })
+
+    const generateButton = screen.getByRole('button', { name: 'Generate banners' })
+    await waitFor(() => expect(generateButton).toBeEnabled())
+    fireEvent.click(generateButton)
+
+    expect(await screen.findByText('Generated 2 banners.')).toBeInTheDocument()
+    expect(screen.getAllByRole('img', { name: /Building reliable agents/ })).toHaveLength(2)
+    expect(screen.getByText(/Speaker · 16:9/)).toBeInTheDocument()
   })
 })

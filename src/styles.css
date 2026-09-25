@@ -124,7 +124,7 @@ h1 {
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px;
   margin: 38px 0 28px;
 }
@@ -357,12 +357,19 @@ button:disabled {
   box-shadow: 0 15px 40px rgb(10 48 84 / 8%);
 }
 
-.banner-card > img {
+.banner-preview {
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 1;
   background: #e9eff5;
+}
+
+.banner-preview-square {
+  aspect-ratio: 1;
+}
+
+.banner-preview-widescreen {
+  aspect-ratio: 16 / 9;
 }
 
 .banner-meta {

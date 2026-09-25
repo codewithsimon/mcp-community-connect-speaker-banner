@@ -18,3 +18,7 @@ export function bannerFilename(sessionTitle: string, speakerNames: string[], com
   const people = combined ? 'all-speakers' : safeFilenamePart(speakerNames.join('-'))
   return `${session}-${people}.png`
 }
+
+export function widescreenBannerFilename(filename: string): string {
+  return filename.replace(/\.png$/i, '-16x9.png')
+}

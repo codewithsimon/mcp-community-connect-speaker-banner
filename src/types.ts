@@ -17,6 +17,7 @@ export interface NormalizedSchedule {
 }
 
 export type BannerKind = 'single' | 'combined' | 'individual'
+export type BannerFormat = 'square' | 'widescreen'
 
 export interface BannerPlan {
   id: string
@@ -32,6 +33,7 @@ export interface PlannedBanners {
 }
 
 export interface GeneratedBanner extends BannerPlan {
+  format: BannerFormat
   blob: Blob
   previewUrl: string
   warnings: string[]

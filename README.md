@@ -1,6 +1,6 @@
 # MCP Community Connect speaker banner generator
 
-A static, browser-only tool for creating 1024×1024 conference speaker banners from a
+A static, browser-only tool for creating 1024×1024 and 1920×1080 conference speaker banners from a
 [Sessionize](https://sessionize.com/) public schedule and a conference-provided background.
 
 The generator uses a fixed MCP Community Connect layout: session title on the left, speaker
@@ -12,7 +12,7 @@ remain part of the uploaded background.
 1. In Sessionize, find the event's public API endpoint. Enter either its API ID (for example,
    `cnyq0f99`) or the complete public endpoint
    (`https://sessionize.com/api/v2/cnyq0f99/view/All`).
-2. Upload the event's 1024×1024 background image.
+2. Upload the event's 1024×1024 square background, 1920×1080 widescreen background, or both.
 3. Select **Generate banners**.
 4. Download an individual PNG or all generated banners in one ZIP.
 
@@ -57,7 +57,7 @@ The production output is written to `dist/`.
 - `src/sessionize.ts` validates public endpoint input and normalizes the Sessionize response.
 - `src/bannerPlan.ts` creates deterministic combined and individual banner plans.
 - `src/textFit.ts` wraps and shrinks text within fixed bounding boxes.
-- `src/renderer.ts` loads bundled DM Sans fonts and renders exact 1024×1024 canvases.
+- `src/renderer.ts` loads bundled DM Sans fonts and renders exact 1024×1024 or 1920×1080 canvases.
 - `src/downloads.ts` handles individual PNG and bulk ZIP downloads.
 
 DM Sans Regular and Bold are bundled through `@fontsource/dm-sans`, so text measurement and
