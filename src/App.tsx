@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { planBanners } from './bannerPlan'
 import { downloadBanner, downloadBannerZip } from './downloads'
+import { widescreenBannerFilename } from './filenames'
 import { renderBanner, validateBackground } from './renderer'
 import { fetchSessionizeSchedule } from './sessionize'
-import type { GeneratedBanner } from './types'
+import type { BannerFormat, GeneratedBanner } from './types'
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
 
@@ -13,8 +14,10 @@ function errorMessage(error: unknown): string {
 
 export default function App() {
   const [apiInput, setApiInput] = useState('')
-  const [background, setBackground] = useState<File | null>(null)
-  const [backgroundError, setBackgroundError] = useState('')
+  const [backgrounds, setBackgrounds] = useState<Partial<Record<BannerFormat, File>>>({})
+  const [backgroundErrors, setBackgroundErrors] = useState<
+    Partial<Record<BannerFormat, string>>
+  >({})
   const [status, setStatus] = useState<Status>('idle')
   const [message, setMessage] = useState('')
   const [warnings, setWarnings] = useState<string[]>([])
@@ -36,26 +39,27 @@ export default function App() {
     setBanners([])
   }
 
-  async function handleBackground(file: File | undefined) {
+  async function handleBackground(format: BannerFormat, file: File | undefined) {
     abortRef.current?.abort()
     generationRef.current += 1
-    setBackground(null)
-    setBackgroundError('')
+    setBackgrounds((current) => ({ ...current, [format]: undefined }))
+    setBackgroundErrors((current) => ({ ...current, [format]: '' }))
     clearBanners()
     if (!file) return
 
     try {
-      await validateBackground(file)
-      setBackground(file)
+      await validateBackground(file, format)
+      setBackgrounds((current) => ({ ...current, [format]: file }))
     } catch (error) {
-      setBackgroundError(errorMessage(error))
+      setBackgroundErrors((current) => ({ ...current, [format]: errorMessage(error) }))
     }
   }
 
   async function generate() {
-    if (!background) {
+    const formats = (['square', 'widescreen'] as const).filter((format) => backgrounds[format])
+    if (formats.length === 0) {
       setStatus('error')
-      setMessage('Upload a valid 1024×1024px conference background first.')
+      setMessage('Upload at least one valid conference background first.')
       return
     }
 
@@ -78,17 +82,26 @@ export default function App() {
       const schedule = await fetchSessionizeSchedule(apiInput, controller.signal)
       const planned = planBanners(schedule.sessions)
 
-      for (const plan of planned.banners) {
-        const rendered = await renderBanner(plan, background)
-        if (generationRef.current !== generation) {
-          discardGenerated()
-          return
+      for (const format of formats) {
+        const background = backgrounds[format]
+        if (!background) continue
+
+        for (const plan of planned.banners) {
+          const rendered = await renderBanner(plan, background, format)
+          if (generationRef.current !== generation) {
+            discardGenerated()
+            return
+          }
+          generated.push({
+            ...plan,
+            id: `${plan.id}-${format}`,
+            filename:
+              format === 'widescreen' ? widescreenBannerFilename(plan.filename) : plan.filename,
+            format,
+            ...rendered,
+            previewUrl: URL.createObjectURL(rendered.blob),
+          })
         }
-        generated.push({
-          ...plan,
-          ...rendered,
-          previewUrl: URL.createObjectURL(rendered.blob),
-        })
       }
 
       if (generationRef.current !== generation) {
@@ -171,21 +184,47 @@ export default function App() {
           </label>
 
           <label>
-            <span>Conference background</span>
-            <div className={`file-input ${backgroundError ? 'invalid' : ''}`}>
+            <span>Square background (optional)</span>
+            <div className={`file-input ${backgroundErrors.square ? 'invalid' : ''}`}>
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 disabled={status === 'loading'}
-                onChange={(event) => void handleBackground(event.target.files?.[0])}
-                aria-describedby="background-help background-error"
+                onChange={(event) => void handleBackground('square', event.target.files?.[0])}
+                aria-describedby="square-background-help square-background-error"
               />
-              <strong>{background ? background.name : 'Choose a 1024×1024 image'}</strong>
-              <small id="background-help">Branding, date, location, and sponsors stay baked in.</small>
+              <strong>
+                {backgrounds.square ? backgrounds.square.name : 'Choose a 1024×1024 image'}
+              </strong>
+              <small id="square-background-help">Creates square social media artwork.</small>
             </div>
-            {backgroundError && (
-              <small id="background-error" className="field-error" role="alert">
-                {backgroundError}
+            {backgroundErrors.square && (
+              <small id="square-background-error" className="field-error" role="alert">
+                {backgroundErrors.square}
+              </small>
+            )}
+          </label>
+
+          <label>
+            <span>16:9 background (optional)</span>
+            <div className={`file-input ${backgroundErrors.widescreen ? 'invalid' : ''}`}>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                disabled={status === 'loading'}
+                onChange={(event) => void handleBackground('widescreen', event.target.files?.[0])}
+                aria-describedby="widescreen-background-help widescreen-background-error"
+              />
+              <strong>
+                {backgrounds.widescreen
+                  ? backgrounds.widescreen.name
+                  : 'Choose a 1920×1080 image'}
+              </strong>
+              <small id="widescreen-background-help">Creates presentation and video artwork.</small>
+            </div>
+            {backgroundErrors.widescreen && (
+              <small id="widescreen-background-error" className="field-error" role="alert">
+                {backgroundErrors.widescreen}
               </small>
             )}
           </label>
@@ -195,7 +234,11 @@ export default function App() {
           className="primary-button"
           type="button"
           onClick={() => void generate()}
-          disabled={status === 'loading' || !apiInput.trim() || !background}
+          disabled={
+            status === 'loading' ||
+            !apiInput.trim() ||
+            (!backgrounds.square && !backgrounds.widescreen)
+          }
         >
           {status === 'loading' ? 'Generating…' : 'Generate banners'}
         </button>
@@ -225,7 +268,7 @@ export default function App() {
             <span>02</span>
             <div>
               <h2 id="results-heading">Preview and download</h2>
-              <p>Exports remain exactly 1024×1024px on every screen size.</p>
+              <p>Exports remain exactly 1024×1024px or 1920×1080px on every screen size.</p>
             </div>
           </div>
           {banners.length > 0 && (
@@ -241,7 +284,7 @@ export default function App() {
 
         {banners.length === 0 ? (
           <div className="empty-state">
-            <div aria-hidden="true">1024</div>
+            <div aria-hidden="true">1:1<br />16:9</div>
             <h3>Your banners will appear here</h3>
             <p>Upload a background and connect a Sessionize public endpoint to begin.</p>
           </div>
@@ -252,12 +295,16 @@ export default function App() {
                 <img
                   src={banner.previewUrl}
                   alt={`${banner.session.title} banner featuring ${banner.speakers.map((speaker) => speaker.fullName).join(', ')}`}
-                  width="1024"
-                  height="1024"
+                  width={banner.format === 'widescreen' ? '1920' : '1024'}
+                  height={banner.format === 'widescreen' ? '1080' : '1024'}
+                  className={`banner-preview banner-preview-${banner.format}`}
                 />
                 <div className="banner-meta">
                   <div>
-                    <span>{banner.kind === 'combined' ? 'Combined' : 'Speaker'}</span>
+                    <span>
+                      {banner.kind === 'combined' ? 'Combined' : 'Speaker'} ·{' '}
+                      {banner.format === 'widescreen' ? '16:9' : 'Square'}
+                    </span>
                     <h3>{banner.session.title}</h3>
                     <p>{banner.speakers.map((speaker) => speaker.fullName).join(', ')}</p>
                   </div>
